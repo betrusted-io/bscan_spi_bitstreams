@@ -245,10 +245,20 @@ class Series7(mg.Module):
     toolchain = "vivado"
 
     def __init__(self, platform):
+        type = 'eFUSE'
         platform.toolchain.bitstream_commands.extend([
-            "set_property BITSTREAM.GENERAL.COMPRESS True [current_design]",
-            "set_property BITSTREAM.CONFIG.UNUSEDPIN Pullnone [current_design]"
+            # "set_property BITSTREAM.GENERAL.COMPRESS True [current_design]",
+            "set_property BITSTREAM.CONFIG.UNUSEDPIN Pullnone [current_design]",
+            "set_property CONFIG_VOLTAGE 1.8 [current_design]",
+            "set_property CFGBVS GND [current_design]",
+            "set_property BITSTREAM.CONFIG.CONFIGRATE 66 [current_design]",
+            "set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 1 [current_design]",
+            "set_property BITSTREAM.ENCRYPTION.ENCRYPT YES [current_design]",
+            "set_property BITSTREAM.ENCRYPTION.ENCRYPTKEYSELECT {} [current_design]".format(type),
+            "set_property BITSTREAM.ENCRYPTION.KEYFILE ../dummy.nky [current_design]",
+            "write_cfgmem -verbose -force -format bin -interface spix1 -size 64 -loadbit \"up 0x0 {build_name}.bit\" -file {build_name}.bin",
         ])
+
         self.submodules.j2s = j2s = JTAG2SPI(platform.request("spiflash"))
         # clk = mg.Signal()
         self.specials += [
@@ -475,10 +485,42 @@ class XilinxBscanSpi(xilinx.XilinxPlatform):
             if errors:
                 raise
 
+import os
+# Equivalent to the powershell Get-Command, and kinda like `which`
+def get_command(cmd):
+    if os.name == 'nt':
+        path_ext = os.environ["PATHEXT"].split(os.pathsep)
+    else:
+        path_ext = [""]
+    for ext in path_ext:
+        for path in os.environ["PATH"].split(os.pathsep):
+            if os.path.exists(path + os.path.sep + cmd + ext):
+                return path + os.path.sep + cmd + ext
+    return None
+
+def check_vivado():
+    vivado_path = get_command("vivado")
+    if vivado_path == None:
+        # Look for the default Vivado install directory
+        if os.name == 'nt':
+            base_dir = r"C:\Xilinx\Vivado"
+        else:
+            base_dir = "/opt/Xilinx/Vivado"
+        if os.path.exists(base_dir):
+            for file in os.listdir(base_dir):
+                bin_dir = base_dir + os.path.sep + file + os.path.sep + "bin"
+                if os.path.exists(bin_dir + os.path.sep + "vivado"):
+                    os.environ["PATH"] += os.pathsep + bin_dir
+                    vivado_path = bin_dir
+                    break
+    if vivado_path == None:
+        return (False, "toolchain not found in your PATH", "download it from https://www.xilinx.com/support/download.html")
+    return (True, "found at {}".format(vivado_path))
 
 if __name__ == "__main__":
     import argparse
     import multiprocessing
+    check_vivado()
     p = argparse.ArgumentParser(description="build bscan_spi bitstreams "
                                 "for openocd jtagspi flash driver")
     p.add_argument("device", nargs="*",
