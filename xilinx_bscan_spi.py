@@ -256,8 +256,10 @@ class Series7(mg.Module):
             "set_property BITSTREAM.ENCRYPTION.ENCRYPT YES [current_design]",
             "set_property BITSTREAM.ENCRYPTION.ENCRYPTKEYSELECT {} [current_design]".format(type),
             "set_property BITSTREAM.ENCRYPTION.KEYFILE ../dummy.nky [current_design]",
-            "write_cfgmem -verbose -force -format bin -interface spix1 -size 64 -loadbit \"up 0x0 {build_name}.bit\" -file {build_name}.bin",
         ])
+        platform.toolchain.additional_commands += [
+            "write_cfgmem -verbose -force -format bin -interface spix1 -size 64 -loadbit \"up 0x0 {build_name}.bit\" -file {build_name}.bin",
+        ]
 
         self.submodules.j2s = j2s = JTAG2SPI(platform.request("spiflash"))
         # clk = mg.Signal()
